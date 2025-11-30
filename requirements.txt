@@ -1,0 +1,49 @@
+# CAPTURE-24 Gait Filter Pipeline - Environment Setup
+# ====================================================
+# 
+# Linux One-Click Install:
+#   sudo apt install libfftw3-dev   # Ubuntu/Debian (for MrSQM)
+#   sudo yum install fftw-devel     # CentOS/RHEL
+#   pip install -r requirements.txt
+#
+# Or use the run.sh script which handles everything automatically.
+# ====================================================
+
+# Option 1: Install with pip (recommended for most servers)
+# ---------------------------------------------------------
+# Core dependencies
+numpy>=1.24,<2.0          # NumPy 2.0 has breaking changes
+scipy>=1.10
+pandas>=2.0
+scikit-learn>=1.3
+joblib>=1.3
+
+# Time-series feature extraction
+sktime>=0.24              # MiniRocket (optional, memory-heavy)
+pyts>=0.12                # SAX, SFA symbolic representations
+
+# Symbolic classifiers
+mrsqm>=0.0.3              # MrSQM for SAX/SFA classification (requires libfftw3-dev on Linux)
+
+# Machine learning models
+xgboost>=2.0
+
+# Statistics (for ACF features)
+statsmodels>=0.14
+
+# Visualization
+matplotlib>=3.7
+seaborn>=0.12
+
+# Optional: for faster computation
+# numba>=0.58             # JIT compilation (optional)
+
+
+# Option 2: Minimal installation (fastest setup, no MiniRocket)
+# -------------------------------------------------------------
+# pip install numpy scipy pandas scikit-learn joblib matplotlib statsmodels pyts mrsqm xgboost
+
+
+# Option 3: Full installation (one-liner)
+# ----------------------------------------
+# pip install numpy scipy pandas scikit-learn joblib matplotlib statsmodels sktime pyts mrsqm xgboost

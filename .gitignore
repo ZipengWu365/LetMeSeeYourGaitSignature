@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Artifacts (large files - don't commit)
+artifacts/features/*.npy
+artifacts/features/*.npz
+artifacts/models/*.pkl
+artifacts/models/*.joblib
+
+# Keep plots (they're small and useful for documentation)
+# !artifacts/plots/
+
+# Logs
+logs/*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data (never commit raw data)
+*.npy
+*.npz
+!artifacts/plots/*.png
