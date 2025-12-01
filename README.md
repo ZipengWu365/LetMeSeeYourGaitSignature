@@ -1,105 +1,187 @@
-# GaitFilter: Walking Detection from Accelerometer Data
+# CAPTURE-24 Gait Filter Pipeline
 
-A machine learning pipeline for detecting walking/gait from wrist-worn accelerometer data, trained on the CAPTURE-24 dataset.
+Walking recognition from wearable accelerometer data using machine learning.
 
-## 🎯 Overview
+---
 
-This project builds a binary classifier to filter "walking" segments from free-living accelerometer data. Key features:
+## 📋 Prerequisites
 
-- **Multiple feature extractors**: Hand-crafted features, MiniRocket, SAX, SFA
-- **Multiple classifiers**: Random Forest, XGBoost, Logistic Regression, Ridge, MrSQM
-- **Production-ready**: Includes model export, inference speed benchmarks, calibration curves
+1. **Python 3.9+** with pip
+2. **CAPTURE-24 prepared data** in `prepared_data/` directory:
+   - `X.npy` - Raw accelerometer data (N, 1000, 3)
+   - `Y_anno.npy` or `Y.npy` - Activity annotations
+   - `P.npy` - Participant IDs
 
-## 📊 Results (CAPTURE-24)
-
-| Model | PR-AUC | F1 | Inference Speed |
-|-------|--------|-----|-----------------|
-| **handcraft_lr** | **0.378** | 0.386 | 0.0003s/1000 windows |
-| handcraft_rf | 0.351 | 0.416 | 0.066s/1000 windows |
-| handcraft_xgb | 0.311 | 0.377 | - |
-| minirocket_lr | 0.301 | 0.411 | - |
+---
 
 ## 🚀 Quick Start
 
-### Prerequisites
-
-1. **CAPTURE-24 Data**: Download from [Oxford Research Archive](https://ora.ox.ac.uk/objects/uuid:99d7c092-d865-4a19-b096-cc16f12bcf25)
-2. **Preprocess**: Use `capture24-master/prepare_data.py` to generate:
-   - `X.npy`: (N, 1000, 3) accelerometer windows
-   - `Y.npy`: (N,) activity labels  
-   - `P.npy`: (N,) participant IDs
-
-### Run Pipeline (Linux)
+### Option 1: Linux One-Click Run (Recommended)
 
 ```bash
-# One-click run
-chmod +x run.sh
-./run.sh --data-dir /path/to/prepared_data
+# From project ROOT directory (important!)
+cd capture24-master
 
-# Skip MiniRocket for faster testing
-./run.sh --data-dir /path/to/prepared_data --skip-minirocket
+# Make script executable and run
+chmod +x experiments/gait_filter/run.sh
+./experiments/gait_filter/run.sh --quick-test
 
-# Quick test mode (10k samples)
-./run.sh --data-dir /path/to/prepared_data --quick-test
+# Full run
+./experiments/gait_filter/run.sh
 ```
 
-### Run Pipeline (Windows/Manual)
+### Option 2: Windows / Manual Python Run
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# From project ROOT directory (important!)
+cd capture24-master
 
-# Run full pipeline
-python run_pipeline.py --project-id MY_EXP --data-dir /path/to/prepared_data
+# Install core dependencies
+pip install numpy scipy pandas scikit-learn joblib matplotlib statsmodels xgboost tqdm
 
-# Run specific phase
-python run_pipeline.py --phases preprocess extract --data-dir /path/to/prepared_data
+# Quick test (~20 seconds)
+python experiments/gait_filter/run_pipeline.py --project-id TEST --max-samples 500 --skip-minirocket
+
+# Full run (all 934k samples, ~1-2 hours)
+python experiments/gait_filter/run_pipeline.py --project-id GF001
 ```
 
-## 📁 Project Structure
+> ⚠️ **Important**: Always run from the project **root** directory, not from `experiments/gait_filter/`
 
-```
-GaitFilter/
-├── run_pipeline.py      # Main entry point
-├── run.sh               # Linux one-click runner
-├── preprocess.py        # Phase 0: ENMO, binary labels, group split
-├── extract_features.py  # Phase 1: Handcraft, MiniRocket, SAX, SFA
-├── train_classifiers.py # Phase 2: Train all classifiers
-├── evaluate.py          # Phase 3: PR curves, confusion matrices
-├── compute_biomarkers.py# Bonus: Extract gait biomarkers from filtered data
-├── requirements.txt     # Dependencies
-├── artifacts/           # Output directory
-│   ├── features/        # Extracted features (*.npy)
-│   ├── models/          # Trained models (*.pkl)
-│   └── plots/           # Visualizations (*.png)
-└── logs/                # Execution logs
+---
+
+## 📦 Dependencies
+
+### Required (Core)
+```bash
+pip install numpy scipy pandas scikit-learn joblib matplotlib statsmodels xgboost tqdm
 ```
 
-## 🔬 Features Extracted
+### Optional (Advanced Features)
+```bash
+# MiniRocket features (requires ~40GB RAM for full data)
+pip install sktime
 
-### Hand-crafted (32 features)
-- Statistical: mean, std, min, max, range, IQR, skew, kurtosis (per axis)
-- ENMO-based: mean ENMO, std ENMO
-- Frequency: dominant frequency, spectral entropy (per axis)
-- Correlation: inter-axis correlations
-
-### MiniRocket (~10,000 features)
-- Random convolutional kernels with PPV aggregation
-- Fast and effective for time series classification
-
-## 📝 Citation
-
-If you use this code, please cite the CAPTURE-24 dataset:
-
-```bibtex
-@article{willetts2018statistical,
-  title={Statistical machine learning of sleep and physical activity phenotypes...},
-  author={Willetts, Matthew and Hollowell, Sven and Maywald, Louis and ...},
-  journal={Scientific reports},
-  year={2018}
-}
+# SAX/SFA symbolic features
+pip install pyts
 ```
 
-## 📄 License
+---
 
-MIT License
+## ⚙️ Command Line Options
+
+```bash
+python experiments/gait_filter/run_pipeline.py [OPTIONS]
+
+Options:
+  --project-id TEXT      Project ID for logs/outputs [default: GF002]
+  --phases TEXT          Phases: all, preprocess, extract, train, evaluate
+  --prepared-dir PATH    Path to prepared_data/ [default: prepared_data]
+  --artifacts-dir PATH   Output directory [default: artifacts/gait_filter]
+  --quick-test           Quick test mode (10k samples)
+  --max-samples INT      Limit samples (for testing)
+  --skip-minirocket      Skip MiniRocket features (saves ~40GB RAM)
+  --seed INT             Random seed [default: 42]
+  --n-jobs INT           Parallel jobs [default: -1]
+```
+
+### Examples
+
+```bash
+# Quick validation
+python experiments/gait_filter/run_pipeline.py --project-id TEST --quick-test --skip-minirocket
+
+# Limit samples
+python experiments/gait_filter/run_pipeline.py --project-id GF002 --max-samples 100000
+
+# Run specific phases
+python experiments/gait_filter/run_pipeline.py --project-id GF002 --phases train,evaluate
+```
+
+---
+
+## 📊 Pipeline Phases
+
+| Phase | Description | Time (10k) | Time (934k) |
+|-------|-------------|------------|-------------|
+| 0. Preprocess | Compute ENMO, binary labels | ~2s | ~3 min |
+| 1. Extract | Hand-crafted features (32-dim) | ~5s | ~10 min |
+| 2. Train | RF, XGBoost, Logistic Regression | ~1s | ~15 min |
+| 3. Evaluate | PR curves, confusion matrices | ~3s | ~5 min |
+
+### Memory Usage
+
+| Data | Shape | Memory |
+|------|-------|--------|
+| X.npy (raw) | (934762, 1000, 3) | ~11 GB (mmap) |
+| handcraft.npy | (934762, 32) | ~120 MB |
+| minirocket.npy | (934762, 9996) | ~37 GB ⚠️ |
+
+> 💡 Use `--skip-minirocket` if you have <32GB RAM
+
+---
+
+## 📁 Output Files
+
+```
+artifacts/gait_filter/
+├── features/
+│   ├── V.npy                    # ENMO time series
+│   ├── Y_binary.npy             # Binary labels (walking=1)
+│   ├── split_indices.npz        # Train/test split
+│   └── handcraft.npy            # Hand-crafted features (32-dim)
+├── models/
+│   ├── handcraft_rf.pkl         # Random Forest
+│   ├── handcraft_xgb.pkl        # XGBoost
+│   └── gait_filter_best.pkl     # Best model (auto-selected)
+└── plots/
+    ├── pr_curves_comparison.png
+    ├── calibration_curves.png
+    └── confusion_matrix_*.png
+
+experiments/gait_filter/
+├── logs/{project_id}_*.log      # Execution logs
+└── {project_id}_final_report.md # Summary report
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### Error: "No such file or directory: prepared_data/X.npy"
+- **Cause**: Running from wrong directory
+- **Fix**: Run from project root: `cd capture24-master`
+
+### Error: "MemoryError" during MiniRocket
+- **Cause**: MiniRocket needs ~40GB RAM
+- **Fix**: Use `--skip-minirocket` or `--max-samples 100000`
+
+### Warning: "pyts not available"
+- **Cause**: Optional dependency missing
+- **Fix**: `pip install pyts` (optional, pipeline works without it)
+
+### XGBoost "use_label_encoder" warning
+- Safe to ignore, doesn't affect results
+
+---
+
+## 📐 ENMO Calculation
+
+**ENMO** (Euclidean Norm Minus One) - standard metric for wearable accelerometry:
+
+$$\text{ENMO} = \max\left(\sqrt{x^2 + y^2 + z^2} - 1g, 0\right)$$
+
+| Activity | ENMO (g) |
+|----------|----------|
+| Sleep/Stationary | 0 - 0.02 |
+| Sedentary | 0.02 - 0.05 |
+| Light Activity | 0.05 - 0.10 |
+| **Walking** | **0.10 - 0.30** |
+| Running | 0.30 - 1.00+ |
+
+---
+
+## 📚 References
+
+- [CAPTURE-24 Dataset](https://github.com/OxWearables/capture24)
+- [UK Biobank Accelerometer Analysis](https://github.com/activityMonitoring/biobankAccelerometerAnalysis)

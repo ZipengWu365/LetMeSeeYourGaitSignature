@@ -1,49 +1,20 @@
-# CAPTURE-24 Gait Filter Pipeline - Environment Setup
-# ====================================================
-# 
-# Linux One-Click Install:
-#   sudo apt install libfftw3-dev   # Ubuntu/Debian (for MrSQM)
-#   sudo yum install fftw-devel     # CentOS/RHEL
-#   pip install -r requirements.txt
-#
-# Or use the run.sh script which handles everything automatically.
-# ====================================================
+# 核心依赖 (服务器环境)
+numpy>=1.24.0,<2.0.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+scipy>=1.10.0
+joblib>=1.3.0
 
-# Option 1: Install with pip (recommended for most servers)
-# ---------------------------------------------------------
-# Core dependencies
-numpy>=1.24,<2.0          # NumPy 2.0 has breaking changes
-scipy>=1.10
-pandas>=2.0
-scikit-learn>=1.3
-joblib>=1.3
+# 可选: Mamba (需要CUDA 11.8+)
+# mamba-ssm>=1.0.0
+# causal-conv1d>=1.1.0
 
-# Time-series feature extraction
-sktime>=0.24              # MiniRocket (optional, memory-heavy)
-pyts>=0.12                # SAX, SFA symbolic representations
+# 可视化 (可选)
+matplotlib>=3.7.0
+seaborn>=0.12.0
 
-# Symbolic classifiers
-mrsqm>=0.0.3              # MrSQM for SAX/SFA classification (requires libfftw3-dev on Linux)
+# 统计分析
+statsmodels>=0.14.0
 
-# Machine learning models
-xgboost>=2.0
-
-# Statistics (for ACF features)
-statsmodels>=0.14
-
-# Visualization
-matplotlib>=3.7
-seaborn>=0.12
-
-# Optional: for faster computation
-# numba>=0.58             # JIT compilation (optional)
-
-
-# Option 2: Minimal installation (fastest setup, no MiniRocket)
-# -------------------------------------------------------------
-# pip install numpy scipy pandas scikit-learn joblib matplotlib statsmodels pyts mrsqm xgboost
-
-
-# Option 3: Full installation (one-liner)
-# ----------------------------------------
-# pip install numpy scipy pandas scikit-learn joblib matplotlib statsmodels sktime pyts mrsqm xgboost
+# 进度条
+tqdm>=4.65.0

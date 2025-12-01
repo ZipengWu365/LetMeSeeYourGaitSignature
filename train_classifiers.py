@@ -246,50 +246,53 @@ def run_training(args, logger: logging.Logger) -> Dict[str, Any]:
     # =========================================================================
     # MiniRocket features + classifiers
     # =========================================================================
-    logger.info("Loading MiniRocket features...")
-    
-    try:
-        X_train, X_test, y_train, y_test = load_features_and_labels(
-            features_dir, "minirocket", max_samples=args.max_samples
-        )
-        logger.info(f"  Train: {X_train.shape}, Test: {X_test.shape}")
+    if getattr(args, 'skip_minirocket', False):
+        logger.info("Skipping MiniRocket classifiers (--skip-minirocket)")
+    else:
+        logger.info("Loading MiniRocket features...")
         
-        # Downsample training
-        X_train_ds, y_train_ds = downsample_training(
-            X_train, y_train,
-            max_positive=10000, neg_pos_ratio=4, seed=args.seed
-        )
-        logger.info(f"  After downsampling: {X_train_ds.shape}")
-        
-        # Ridge Classifier (standard for Rocket)
-        ridge = Pipeline([
-            ('scaler', StandardScaler()),
-            ('clf', RidgeClassifier(alpha=1.0))
-        ])
-        results_ridge = train_and_evaluate(
-            X_train_ds, X_test, y_train_ds, y_test,
-            "minirocket_ridge", ridge, logger
-        )
-        all_results['minirocket_ridge'] = results_ridge
-        joblib.dump(ridge, models_dir / "minirocket_ridge.pkl")
-        
-        # Logistic Regression
-        lr = Pipeline([
-            ('scaler', StandardScaler()),
-            ('clf', LogisticRegression(
-                max_iter=2000, solver='saga', n_jobs=args.n_jobs,
-                random_state=args.seed
-            ))
-        ])
-        results_lr = train_and_evaluate(
-            X_train_ds, X_test, y_train_ds, y_test,
-            "minirocket_lr", lr, logger
-        )
-        all_results['minirocket_lr'] = results_lr
-        joblib.dump(lr, models_dir / "minirocket_lr.pkl")
-        
-    except FileNotFoundError as e:
-        logger.warning(f"MiniRocket features not found: {e}")
+        try:
+            X_train, X_test, y_train, y_test = load_features_and_labels(
+                features_dir, "minirocket", max_samples=args.max_samples
+            )
+            logger.info(f"  Train: {X_train.shape}, Test: {X_test.shape}")
+            
+            # Downsample training
+            X_train_ds, y_train_ds = downsample_training(
+                X_train, y_train,
+                max_positive=10000, neg_pos_ratio=4, seed=args.seed
+            )
+            logger.info(f"  After downsampling: {X_train_ds.shape}")
+            
+            # Ridge Classifier (standard for Rocket)
+            ridge = Pipeline([
+                ('scaler', StandardScaler()),
+                ('clf', RidgeClassifier(alpha=1.0))
+            ])
+            results_ridge = train_and_evaluate(
+                X_train_ds, X_test, y_train_ds, y_test,
+                "minirocket_ridge", ridge, logger
+            )
+            all_results['minirocket_ridge'] = results_ridge
+            joblib.dump(ridge, models_dir / "minirocket_ridge.pkl")
+            
+            # Logistic Regression
+            lr = Pipeline([
+                ('scaler', StandardScaler()),
+                ('clf', LogisticRegression(
+                    max_iter=2000, solver='saga', n_jobs=args.n_jobs,
+                    random_state=args.seed
+                ))
+            ])
+            results_lr = train_and_evaluate(
+                X_train_ds, X_test, y_train_ds, y_test,
+                "minirocket_lr", lr, logger
+            )
+            all_results['minirocket_lr'] = results_lr
+            joblib.dump(lr, models_dir / "minirocket_lr.pkl")
+            
+        except FileNotFoundError as e:
+            logger.warning(f"MiniRocket features not found: {e}")
     
     # =========================================================================
     # SAX + MrSQM
