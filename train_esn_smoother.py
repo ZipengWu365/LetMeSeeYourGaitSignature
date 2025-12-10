@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import joblib
 from sklearn.metrics import f1_score, classification_report
+from sklearn.preprocessing import LabelEncoder
 
 import torch
 import torch.nn as nn
@@ -58,6 +59,7 @@ class ESNSmootherCUDA:
         self.W_res = None
         self.W_out = None
         self.input_dim = None
+        self.label_encoder = None
     
     def _init_weights(self, input_dim):
         """初始化ESN权重矩阵"""
@@ -134,6 +136,13 @@ class ESNSmootherCUDA:
         # 合并所有状态
         X_states = np.vstack(all_states)
         y_targets = np.concatenate(all_targets)
+
+        # 编码标签 (处理字符串标签如 'sleep', 'walking' 等)
+        if self.label_encoder is None:
+            self.label_encoder = LabelEncoder()
+            y_targets_encoded = self.label_encoder.fit_transform(y_targets)
+        else:
+            y_targets_encoded = self.label_encoder.transform(y_targets)
         
         print(f"  Reservoir states: {X_states.shape}")
         
@@ -146,7 +155,7 @@ class ESNSmootherCUDA:
         
         # One-hot编码目标
         y_onehot = np.zeros((len(y_targets), self.n_classes))
-        y_onehot[np.arange(len(y_targets)), y_targets.astype(np.int32)] = 1
+        y_onehot[np.arange(len(y_targets)), y_targets_encoded] = 1
         y_tensor = torch.FloatTensor(y_onehot).to(self.device)
         
         # Ridge回归闭式解: W = (X^T X + αI)^{-1} X^T y
