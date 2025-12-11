@@ -7,18 +7,28 @@ Uses Mamba SSM for temporal smoothing with GPU acceleration
 
 import argparse
 import sys
+import traceback
 from pathlib import Path
 import numpy as np
 import joblib
 from sklearn.metrics import f1_score, classification_report
 from sklearn.preprocessing import LabelEncoder
 
-print("[*] Importing Mamba...")
+# Import PyTorch first (always needed)
 try:
     import torch
     import torch.nn as nn
     import torch.optim as optim
     from torch.utils.data import Dataset, DataLoader
+    TORCH_AVAILABLE = True
+except ImportError as e:
+    TORCH_AVAILABLE = False
+    print(f"[ERROR] PyTorch not available: {e}")
+    sys.exit(1)
+
+# Try to import Mamba
+print("[*] Importing Mamba...")
+try:
     from mamba_ssm import Mamba
     MAMBA_AVAILABLE = True
     print("  [OK] Mamba-SSM available")
@@ -141,7 +151,7 @@ class MambaSmootherWrapper:
             self.label_encoder = LabelEncoder()
             self.label_encoder.fit(y_true)
             print(f"  [INFO] Classes: {self.label_encoder.classes_}")
-        
+
         # Create dataset
         dataset = SequenceDataset(inputs, y_true, groups, self.label_encoder)
 
@@ -266,82 +276,103 @@ def main():
     print(f"  Training Mamba Smoother: {args.exp_id} (CUDA accelerated)")
     print(f"{'='*70}\n")
 
-    device = get_device()
+    try:
+        device = get_device()
 
-    # Load data
-    data_dir = Path(args.data_dir)
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(exist_ok=True, parents=True)
+        # Load data
+        data_dir = Path(args.data_dir)
+        output_dir = Path(args.output_dir)
+        output_dir.mkdir(exist_ok=True, parents=True)
 
-    print("[1/4] Loading data...")
-    split_info = joblib.load(data_dir / 'train_test_split.pkl')
-    train_mask = split_info['train_mask']
-    test_mask = split_info['test_mask']
+        print("[1/4] Loading data...")
+        
+        # Check required files
+        required_files = ['train_test_split.pkl', 'y_train_proba_rf.npy', 'y_test_proba_rf.npy', 
+                          'Y_Walmsley2020.npy', 'P.npy']
+        for f in required_files:
+            fpath = data_dir / f
+            if not fpath.exists():
+                print(f"  [ERROR] Required file not found: {fpath}")
+                print(f"  [INFO] Please run train_baseline.py first to generate RF probabilities")
+                sys.exit(1)
+            else:
+                print(f"  [OK] Found: {f}")
+        
+        split_info = joblib.load(data_dir / 'train_test_split.pkl')
+        train_mask = split_info['train_mask']
+        test_mask = split_info['test_mask']
 
-    y_train_proba = np.load(data_dir / 'y_train_proba_rf.npy')
-    y_test_proba = np.load(data_dir / 'y_test_proba_rf.npy')
+        y_train_proba = np.load(data_dir / 'y_train_proba_rf.npy')
+        y_test_proba = np.load(data_dir / 'y_test_proba_rf.npy')
 
-    Y = np.load(data_dir / 'Y_Walmsley2020.npy')
-    P = np.load(data_dir / 'P.npy')
+        Y = np.load(data_dir / 'Y_Walmsley2020.npy')
+        P = np.load(data_dir / 'P.npy')
 
-    y_train = Y[train_mask]
-    y_test = Y[test_mask]
-    P_train = P[train_mask]
-    P_test = P[test_mask]
+        y_train = Y[train_mask]
+        y_test = Y[test_mask]
+        P_train = P[train_mask]
+        P_test = P[test_mask]
 
-    print(f"  Training set: {y_train_proba.shape}")
-    print(f"  Test set: {y_test_proba.shape}")
+        print(f"  Training set: {y_train_proba.shape}")
+        print(f"  Test set: {y_test_proba.shape}")
+        print(f"  Labels dtype: {y_train.dtype}")
 
-    # Auxiliary features
-    aux_train = None
-    aux_test = None
-    if args.aux_features != 'none':
-        print(f"\n[2/4] Computing auxiliary features ({args.aux_features})...")
-        try:
-            X_raw = np.load(data_dir / 'X.npy', mmap_mode='r')
-            aux_train = compute_auxiliary_features(X_raw[train_mask], args.aux_features)
-            aux_test = compute_auxiliary_features(X_raw[test_mask], args.aux_features)
-            print(f"  Auxiliary feature dim: {aux_train.shape[1]}")
-        except FileNotFoundError:
-            print("  [WARN] X.npy not found, skipping auxiliary features")
-    else:
-        print("\n[2/4] Skipping auxiliary features...")
+        # Auxiliary features
+        aux_train = None
+        aux_test = None
+        if args.aux_features != 'none':
+            print(f"\n[2/4] Computing auxiliary features ({args.aux_features})...")
+            try:
+                X_raw = np.load(data_dir / 'X.npy', mmap_mode='r')
+                aux_train = compute_auxiliary_features(X_raw[train_mask], args.aux_features)
+                aux_test = compute_auxiliary_features(X_raw[test_mask], args.aux_features)
+                print(f"  Auxiliary feature dim: {aux_train.shape[1]}")
+            except FileNotFoundError:
+                print("  [WARN] X.npy not found, skipping auxiliary features")
+        else:
+            print("\n[2/4] Skipping auxiliary features...")
 
-    # Training
-    print(f"\n[3/4] Training Mamba Smoother...")
-    mamba = MambaSmootherWrapper(
-        n_classes=4,
-        d_model=args.d_model,
-        n_layers=args.n_layers,
-        epochs=args.epochs,
-        lr=args.lr,
-        device=device,
-    )
+        # Training
+        print(f"\n[3/4] Training Mamba Smoother...")
+        mamba = MambaSmootherWrapper(
+            n_classes=4,
+            d_model=args.d_model,
+            n_layers=args.n_layers,
+            epochs=args.epochs,
+            lr=args.lr,
+            device=device,
+        )
 
-    mamba.fit(y_train_proba, y_train, P_train, aux_train)
+        mamba.fit(y_train_proba, y_train, P_train, aux_train)
 
-    # Evaluation
-    print("\n[4/4] Evaluating model...")
-    y_pred = mamba.predict(y_test_proba, P_test, aux_test)
+        # Evaluation
+        print("\n[4/4] Evaluating model...")
+        y_pred = mamba.predict(y_test_proba, P_test, aux_test)
 
-    f1_macro = f1_score(y_test, y_pred, average='macro')
-    f1_per_class = f1_score(y_test, y_pred, average=None)
+        f1_macro = f1_score(y_test, y_pred, average='macro')
+        f1_per_class = f1_score(y_test, y_pred, average=None)
 
-    print("\n" + "="*70)
-    print(f"  {args.exp_id} Test Results")
-    print("="*70)
-    print(classification_report(y_test, y_pred))
-    print(f"\nMacro F1: {f1_macro:.4f}")
-    print(f"Per-class F1: {f1_per_class}")
+        print("\n" + "="*70)
+        print(f"  {args.exp_id} Test Results")
+        print("="*70)
+        print(classification_report(y_test, y_pred))
+        print(f"\nMacro F1: {f1_macro:.4f}")
+        print(f"Per-class F1: {f1_per_class}")
 
-    # Save model
-    model_path = output_dir / f'mamba_{args.exp_id}.pkl'
-    joblib.dump(mamba, model_path)
-    print(f"\n[OK] Model saved: {model_path}")
+        # Save model
+        model_path = output_dir / f'mamba_{args.exp_id}.pkl'
+        joblib.dump(mamba, model_path)
+        print(f"\n[OK] Model saved: {model_path}")
 
-    print(f"\n{'='*70}")
-    print(f"  [OK] Training complete! Macro F1 = {f1_macro:.4f}")
-    print(f"{'='*70}\n")
+        print(f"\n{'='*70}")
+        print(f"  [OK] Training complete! Macro F1 = {f1_macro:.4f}")
+        print(f"{'='*70}\n")
+
+    except Exception as e:
+        print(f"\n[ERROR] Exception occurred: {e}")
+        print("\nFull traceback:")
+        traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == '__main__':
